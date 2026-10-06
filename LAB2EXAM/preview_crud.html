@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ItemManager - Live XAMPP Database Connection</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans min-h-screen flex flex-col justify-between">
+
+    <!-- Database Status Bar -->
+    <div id="connectionBanner" class="bg-emerald-600 text-white px-4 py-2 text-xs text-center font-medium shadow-sm flex items-center justify-center gap-2">
+        <i class="fa-solid fa-circle-check text-emerald-200"></i>
+        <span><b>Connected to XAMPP MySQL:</b> All actions in this HTML interface now directly create, edit, and delete records in your <code>laravel_crud</code> database!</span>
+    </div>
+
+    <!-- Header Navigation -->
+    <header class="bg-white border-b border-gray-200 sticky top-0 z-30 shadow-sm">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
+            <button onclick="showView('index')" class="flex items-center gap-2 text-xl font-bold text-indigo-600 hover:text-indigo-700 transition">
+                <i class="fa-solid fa-boxes-stacked text-2xl"></i>
+                <span>ItemManager</span>
+            </button>
+            <div class="flex items-center gap-3">
+                <button onclick="loadItemsFromDb()" class="inline-flex items-center gap-1.5 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold rounded-lg transition" title="Refresh data from XAMPP">
+                    <i class="fa-solid fa-arrows-rotate"></i>
+                    <span>Refresh</span>
+                </button>
+                <button onclick="openCreateModal()" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg shadow-sm transition">
+                    <i class="fa-solid fa-plus"></i>
+                    <span>Add Item</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-5xl mx-auto px-4 sm:px-6 py-8 w-full">
+        <!-- Flash Alert -->
+        <div id="alertBox" class="hidden mb-6 items-center justify-between p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl shadow-sm transition-all">
+            <div class="flex items-center gap-3">
+                <i class="fa-solid fa-circle-check text-emerald-600 text-lg"></i>
+                <p id="alertMsg" class="text-sm font-medium"></p>
+            </div>
+            <button onclick="document.getElementById('alertBox').classList.add('hidden')" class="text-emerald-500 hover:text-emerald-700">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <!-- 1. INDEX VIEW -->
+        <div id="indexView" class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                    <h1 class="text-xl font-bold text-gray-900">Inventory Items</h1>
+                    <p class="text-xs text-gray-500 mt-1">Live synchronized with XAMPP MySQL database (<code>laravel_crud.items</code>)</p>
+                </div>
+                <span id="itemCountBadge" class="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-800 text-xs font-semibold rounded-full w-fit border border-emerald-200">
+                    <i class="fa-solid fa-database text-emerald-600"></i>
+                    <span>Connecting to XAMPP...</span>
+                </span>
+            </div>
+
+            <!-- Empty State -->
+            <div id="emptyState" class="hidden text-center py-16 px-4">
+                <div class="w-16 h-16 bg-indigo-50 text-indigo-500 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">
+                    <i class="fa-regular fa-folder-open"></i>
+                </div>
+                <h3 class="text-base font-semibold text-gray-900">No items in XAMPP database</h3>
+                <p class="text-sm text-gray-500 mt-1 mb-6">Create a new item below to save it directly into MySQL.</p>
+                <button onclick="openCreateModal()" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg shadow-sm transition">
+                    <i class="fa-solid fa-plus"></i>
+                    <span>Add Item Now</span>
+                </button>
+            </div>
+
+            <!-- Table -->
+            <div id="tableContainer" class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-gray-50/75 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                            <th class="py-3.5 px-6">ID</th>
+                            <th class="py-3.5 px-6">Item Name</th>
+                            <th class="py-3.5 px-6">Description</th>
+                            <th class="py-3.5 px-6">Price</th>
+                            <th class="py-3.5 px-6 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="itemsTableBody" class="divide-y divide-gray-100 text-sm">
+                        <!-- Populated live from XAMPP -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 2. CREATE / EDIT FORM VIEW -->
+        <div id="formView" class="hidden max-w-xl mx-auto">
+            <button onclick="showView('index')" class="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 mb-4 transition font-medium">
+                <i class="fa-solid fa-arrow-left"></i>
+                <span>Back to items list</span>
+            </button>
+
+            <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 sm:p-8">
+                <div class="mb-6">
+                    <h1 id="formTitle" class="text-xl font-bold text-gray-900">Add New Item</h1>
+                    <p id="formSubtitle" class="text-xs text-gray-500 mt-1">Saves directly into your XAMPP MySQL database.</p>
+                </div>
+
+                <form id="itemForm" onsubmit="handleFormSubmit(event)" class="space-y-5">
+                    <input type="hidden" id="itemId">
+                    <div>
+                        <label for="itemName" class="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">Item Name</label>
+                        <input type="text" id="itemName" placeholder="e.g. Wireless Mouse"
+                               class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm transition" required>
+                    </div>
+
+                    <div>
+                        <label for="itemPrice" class="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">Price ($)</label>
+                        <input type="number" step="0.01" id="itemPrice" placeholder="0.00"
+                               class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm transition" required>
+                    </div>
+
+                    <div>
+                        <label for="itemDesc" class="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">Description</label>
+                        <textarea id="itemDesc" rows="4" placeholder="Briefly describe this item..."
+                                  class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm transition" required></textarea>
+                    </div>
+
+                    <div class="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
+                        <button type="button" onclick="showView('index')" class="px-5 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition">
+                            Cancel
+                        </button>
+                        <button type="submit" id="submitBtn" class="px-5 py-2.5 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-sm transition inline-flex items-center gap-2">
+                            <i class="fa-solid fa-check"></i>
+                            <span id="submitBtnText">Save to XAMPP</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-gray-200 py-4 text-center text-xs text-gray-500 mt-auto">
+        Live XAMPP MySQL CRUD Connection &bull; Database: <code>laravel_crud</code>
+    </footer>
+
+    <script>
+        const API_URL = "http://localhost/LAB2EXAM/api.php";
+        let currentItems = [];
+
+        async function loadItemsFromDb() {
+            try {
+                const res = await fetch(API_URL);
+                if (!res.ok) throw new Error("Could not reach XAMPP API");
+                currentItems = await res.json();
+                renderTable(currentItems);
+            } catch (err) {
+                console.error("XAMPP DB Error:", err);
+                const countBadge = document.getElementById('itemCountBadge');
+                countBadge.className = "inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-800 text-xs font-semibold rounded-full w-fit border border-amber-200";
+                countBadge.innerHTML = `<i class="fa-solid fa-circle-exclamation text-amber-600"></i> Check XAMPP Apache is running!`;
+            }
+        }
+
+        function showAlert(msg) {
+            const alertBox = document.getElementById('alertBox');
+            document.getElementById('alertMsg').textContent = msg;
+            alertBox.classList.remove('hidden');
+            alertBox.classList.add('flex');
+            setTimeout(() => {
+                alertBox.classList.add('hidden');
+                alertBox.classList.remove('flex');
+            }, 4000);
+        }
+
+        function showView(view) {
+            if (view === 'index') {
+                document.getElementById('indexView').classList.remove('hidden');
+                document.getElementById('formView').classList.add('hidden');
+                loadItemsFromDb();
+            } else {
+                document.getElementById('indexView').classList.add('hidden');
+                document.getElementById('formView').classList.remove('hidden');
+            }
+        }
+
+        function openCreateModal() {
+            document.getElementById('itemId').value = '';
+            document.getElementById('itemName').value = '';
+            document.getElementById('itemPrice').value = '';
+            document.getElementById('itemDesc').value = '';
+            document.getElementById('formTitle').textContent = 'Add New Item';
+            document.getElementById('formSubtitle').textContent = 'Saves directly into your XAMPP MySQL database.';
+            document.getElementById('submitBtnText').textContent = 'Save to XAMPP';
+            showView('form');
+        }
+
+        function openEditModal(id) {
+            const item = currentItems.find(i => parseInt(i.id) === parseInt(id));
+            if (!item) return;
+            document.getElementById('itemId').value = item.id;
+            document.getElementById('itemName').value = item.name;
+            document.getElementById('itemPrice').value = item.price;
+            document.getElementById('itemDesc').value = item.description;
+            document.getElementById('formTitle').textContent = 'Edit Item #' + item.id;
+            document.getElementById('formSubtitle').textContent = 'Updates directly in your XAMPP MySQL database.';
+            document.getElementById('submitBtnText').textContent = 'Update in XAMPP';
+            showView('form');
+        }
+
+        async function deleteItem(id) {
+            if (confirm('Are you sure you want to delete this item from the XAMPP database?')) {
+                try {
+                    const res = await fetch(`${API_URL}?id=${id}`, {
+                        method: 'DELETE'
+                    });
+                    const data = await res.json();
+                    showAlert(data.message || 'Item deleted from XAMPP database!');
+                    loadItemsFromDb();
+                } catch (err) {
+                    alert('Failed to delete item from XAMPP database: ' + err.message);
+                }
+            }
+        }
+
+        async function handleFormSubmit(e) {
+            e.preventDefault();
+            const id = document.getElementById('itemId').value;
+            const name = document.getElementById('itemName').value.trim();
+            const price = parseFloat(document.getElementById('itemPrice').value);
+            const description = document.getElementById('itemDesc').value.trim();
+
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = true;
+
+            try {
+                if (id) {
+                    // Update
+                    const res = await fetch(API_URL, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ id, name, price, description })
+                    });
+                    const data = await res.json();
+                    showAlert(data.message || 'Item updated in XAMPP database!');
+                } else {
+                    // Create
+                    const res = await fetch(API_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name, price, description })
+                    });
+                    const data = await res.json();
+                    showAlert(data.message || 'Item saved directly to XAMPP database!');
+                }
+
+                showView('index');
+            } catch (err) {
+                alert('Database Error: ' + err.message);
+            } finally {
+                submitBtn.disabled = false;
+            }
+        }
+
+        function renderTable(items) {
+            const tbody = document.getElementById('itemsTableBody');
+            const emptyState = document.getElementById('emptyState');
+            const tableContainer = document.getElementById('tableContainer');
+            const countBadge = document.getElementById('itemCountBadge');
+
+            countBadge.className = "inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-800 text-xs font-semibold rounded-full w-fit border border-emerald-200";
+            countBadge.innerHTML = `<i class="fa-solid fa-database text-emerald-600"></i> <span>Total in XAMPP: ${items.length} item(s)</span>`;
+
+            if (!items || items.length === 0) {
+                emptyState.classList.remove('hidden');
+                tableContainer.classList.add('hidden');
+            } else {
+                emptyState.classList.add('hidden');
+                tableContainer.classList.remove('hidden');
+
+                tbody.innerHTML = items.map(item => `
+                    <tr class="hover:bg-gray-50/60 transition">
+                        <td class="py-4 px-6 text-gray-400 font-mono text-xs">#${item.id}</td>
+                        <td class="py-4 px-6 font-semibold text-gray-900">${escapeHtml(item.name)}</td>
+                        <td class="py-4 px-6 text-gray-600 max-w-xs truncate">${escapeHtml(item.description)}</td>
+                        <td class="py-4 px-6">
+                            <span class="inline-block px-2.5 py-1 bg-emerald-50 text-emerald-700 font-semibold text-xs rounded-md">
+                                $${Number(item.price).toFixed(2)}
+                            </span>
+                        </td>
+                        <td class="py-4 px-6 text-right">
+                            <div class="flex items-center justify-end gap-2">
+                                <button onclick="openEditModal(${item.id})" 
+                                        class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-lg transition"
+                                        title="Edit Item">
+                                    <i class="fa-solid fa-pen-to-square"></i>
+                                    <span>Edit</span>
+                                </button>
+                                <button onclick="deleteItem(${item.id})" 
+                                        class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-lg transition"
+                                        title="Delete Item">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                    <span>Delete</span>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        // Initialize on load
+        loadItemsFromDb();
+    </script>
+</body>
+</html>
